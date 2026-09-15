@@ -8,7 +8,6 @@ First, install PyTorch according to your system's hardware (CPU or GPU) by follo
 ```bash
 pip install gradio pillow numpy
 pip install -q ftfy regex tqdm scikit-image git+https://github.com/openai/CLIP.git
-
 ```
 
 **Setting Up the Image Cache**
@@ -23,10 +22,9 @@ pip install -q ftfy regex tqdm scikit-image git+https://github.com/openai/CLIP.g
 
 ```bash
 python app.py
-
 ```
 
-2. Open the provided `[http://127.0.0.1:7860/](http://127.0.0.1:7860/)` local URL in your web browser.
+2. Open the provided local URL in your web browser.
 3. To search using **text**: Type a descriptive query (e.g., "a dog playing in grass") into the chat box and press enter.
 4. To search using an **image**: Click the paperclip icon in the chat box, upload a reference image, and press enter.
 5. Use the "Number of Results (Top K)" slider to control how many ranked matches the gallery displays.

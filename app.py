@@ -104,8 +104,8 @@ def search(message, history, top_k):
 with gr.Blocks() as demo:
     results = gr.Gallery(
     columns=1, 
-    height=800, 
-    object_fit="contain", 
+    height=800,
+    object_fit="scale-down", 
     render=False
 )
     top_k_slider = gr.Slider(
