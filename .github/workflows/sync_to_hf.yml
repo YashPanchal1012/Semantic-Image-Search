@@ -11,13 +11,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          lfs: true
 
-      - name: Push to Hugging Face Space
+      - name: Push clean snapshot to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push --force https://yashpanchal1012:$HF_TOKEN@huggingface.co/spaces/yashpanchal1012/semantic-image-search main
-
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git checkout --orphan hf-deploy
+          git add -A
+          git commit -m "Deploy latest app to Hugging Face Spaces"
+          git push --force https://yashpanchal1012:$HF_TOKEN@huggingface.co/spaces/yashpanchal1012/semantic-image-search hf-deploy:main
