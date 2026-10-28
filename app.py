@@ -1,3 +1,14 @@
+# 0. Hugging Face ZeroGPU compatibility: MUST be imported before torch or any CUDA library!
+try:
+    import spaces
+except ImportError:
+    class spaces:
+        @staticmethod
+        def GPU(fn=None, **kwargs):
+            if fn is None:
+                return lambda f: f
+            return fn
+
 import os
 from pathlib import Path
 import tempfile
@@ -10,30 +21,17 @@ import gradio as gr
 import numpy as np
 import torch
 
-# Hugging Face ZeroGPU compatibility
-try:
-    import spaces
-except ImportError:
-    class spaces:
-        @staticmethod
-        def GPU(fn=None, **kwargs):
-            if fn is None:
-                return lambda f: f
-            return fn
-
-
-# 1. Load CLIP model globally once
+# 1. Load CLIP model globally on CPU at startup (ZeroGPU moves to CUDA inside @spaces.GPU)
 model_name = "ViT-B/32"
-default_device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Loading CLIP ({model_name}) on {default_device}...")
-model, preprocess = clip.load(model_name, device=default_device)
+print(f"Loading CLIP ({model_name})...")
+model, preprocess = clip.load(model_name, device="cpu")
 model.eval()
 
 VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 
 def get_current_device():
-    """Return 'cuda' if GPU is available (e.g. inside @spaces.GPU), else 'cpu'."""
+    """Return 'cuda' if GPU is active (inside @spaces.GPU), else 'cpu'."""
     return "cuda" if torch.cuda.is_available() else "cpu"
 
 
