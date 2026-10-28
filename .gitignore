@@ -1,3 +1,5 @@
 test.py
 *.pdf
 Images/
+*.txt
+!requirements.txt
