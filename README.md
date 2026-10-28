@@ -10,31 +10,24 @@ pinned: false
 
 # Semantic-Image-Search
 
-**Installation**
-To run this application, you need Python 3.8+ and the following dependencies.
+A CLIP-powered semantic image search engine with a Gradio web interface. Search through any collection of images using descriptive natural language or reference images.
 
-First, install PyTorch according to your system's hardware (CPU or GPU) by following the instructions at pytorch.org. Then, install the remaining requirements and OpenAI's CLIP repository:
+## Features
+- **Zero repository images needed**: Users can upload their own images or a `.zip` archive directly in the web interface.
+- **Multimodal search**: Search by natural language query (text) or by uploading an image.
+- **Session-isolated**: Each visitor's uploaded database and search session is private to their browser tab.
+- **Batched CLIP inference**: Embeddings are computed efficiently on CPU or GPU in mini-batches.
 
+## Running Locally
+
+1. Install dependencies:
 ```bash
-pip install gradio pillow numpy
-pip install -q ftfy regex tqdm scikit-image git+https://github.com/openai/CLIP.git
+pip install -r requirements.txt
 ```
 
-**Setting Up the Image Cache**
-
-1. Create a folder named `Images` in the same directory as your Python script.
-2. Place all the images (`.jpg`, `.png`, etc.) you want to make searchable inside this `Images` folder.
-3. When you start the Gradio app, the script will automatically read all files in this folder, process them through the CLIP model, and store their embeddings in a PyTorch tensor in memory. This serves as your search cache.
-
-**Running a Query**
-
-1. Execute the Python script from your terminal:
-
+2. Run the application:
 ```bash
 python app.py
 ```
 
-2. Open the provided local URL in your web browser.
-3. To search using **text**: Type a descriptive query (e.g., "a dog playing in grass") into the chat box and press enter.
-4. To search using an **image**: Click the paperclip icon in the chat box, upload a reference image, and press enter.
-5. Use the "Number of Results (Top K)" slider to control how many ranked matches the gallery displays.
+3. Open the displayed local URL in your browser, upload your images or `.zip` in Step 1, and search in Step 2!

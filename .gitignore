@@ -3,3 +3,4 @@ test.py
 Images/
 *.txt
 !requirements.txt
+__pycache__/
