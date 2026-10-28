@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from PIL import Image
 import time
@@ -17,44 +18,48 @@ model.eval()
 
 # 2. Load images and preprocesses
 folder_path = Path("Images")
-image_paths_np = np.array(
-    [
-        f.relative_to(folder_path.parent).as_posix()
-        for f in folder_path.iterdir()
-        if f.is_file()
-    ]
-)
+folder_path.mkdir(parents=True, exist_ok=True)
+
+valid_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+image_files = [
+    f.relative_to(folder_path.parent).as_posix()
+    for f in folder_path.iterdir()
+    if f.is_file() and f.suffix.lower() in valid_extensions
+]
+
 image_tensors = []
-for path in image_paths_np:
-    image = Image.open(path).convert("RGB")
-    image_tensors.append(preprocess(image))
+valid_paths = []
+for path in image_files:
+    try:
+        image = Image.open(path).convert("RGB")
+        image_tensors.append(preprocess(image))
+        valid_paths.append(path)
+    except Exception as e:
+        print(f"Skipping {path}: {e}")
 
-image_batch = torch.stack(image_tensors).to(device)
-
-# print("Number of paths: ", len(image_paths_np))
-# print("One image tensor:", tuple(image_tensors[0].shape))
-# print("Complete batch:  ", tuple(image_batch.shape))
-
+image_paths_np = np.array(valid_paths)
 
 # 3. Encode and Store
-start = time.perf_counter()
-with torch.inference_mode():
-    raw_image_embeddings = model.encode_image(image_batch).float()
+if len(image_tensors) > 0:
+    image_batch = torch.stack(image_tensors).to(device)
+    start = time.perf_counter()
+    with torch.inference_mode():
+        raw_image_embeddings = model.encode_image(image_batch).float()
 
-image_embeddings = raw_image_embeddings / raw_image_embeddings.norm(dim=1, keepdim=True)
-if device == "cuda":
-    torch.cuda.synchronize()
-elapsed = time.perf_counter() - start
-
-# print("Embedding matrix shape:", tuple(image_embeddings.shape))
-# print("Embedding dtype:       ", image_embeddings.dtype)
-# print("Raw norms:             ", raw_image_embeddings.norm(dim=1).cpu().numpy())
-# print("Normalized norms:      ", image_embeddings.norm(dim=1).cpu().numpy())
-# print(f"Encoding time:          {elapsed:.3f} seconds")
+    image_embeddings = raw_image_embeddings / raw_image_embeddings.norm(dim=1, keepdim=True)
+    if device == "cuda":
+        torch.cuda.synchronize()
+    elapsed = time.perf_counter() - start
+    print(f"Loaded and encoded {len(image_paths_np)} images in {elapsed:.3f} seconds.")
+else:
+    image_embeddings = None
+    print("Notice: No images found in the 'Images' folder yet. Place image files inside 'Images/' to search.")
 
 
 # Search Function
 def search(message, history, top_k):
+    if image_embeddings is None or len(image_paths_np) == 0:
+        return "No images found in the 'Images' directory. Please add images to search.", []
 
     text_query = message.get("text", "")
     files = message.get("files", [])
@@ -103,11 +108,11 @@ def search(message, history, top_k):
 # Gradio Interface 
 with gr.Blocks() as demo:
     results = gr.Gallery(
-    columns=1, 
-    height=800,
-    object_fit="scale-down", 
-    render=False
-)
+        columns=1, 
+        height=800,
+        object_fit="scale-down", 
+        render=False
+    )
     top_k_slider = gr.Slider(
         minimum=1, maximum=10, step=1, value=5, label="Choose number of top results",
     )
@@ -116,10 +121,6 @@ with gr.Blocks() as demo:
             gr.Markdown("<center><h1>Semantic Image Search</h1></center>")
             gr.ChatInterface(
                 fn=search,
-                # examples=[
-                #     ["a photo of a bottle", 5],
-                #     ["a photo of a cup of coffee", 5],
-                # ],
                 multimodal=True,
                 additional_inputs=[top_k_slider],
                 additional_outputs=[results],
@@ -129,4 +130,7 @@ with gr.Blocks() as demo:
             gr.Markdown("<center><h1>Search Results</h1></center>")
             results.render()
 
-demo.launch()
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 7860))
+    share = os.environ.get("GRADIO_SHARE", "False").lower() in ("true", "1")
+    demo.launch(server_name="0.0.0.0", server_port=port, share=share)
