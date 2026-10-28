@@ -10,14 +10,31 @@ import gradio as gr
 import numpy as np
 import torch
 
+# Hugging Face ZeroGPU compatibility
+try:
+    import spaces
+except ImportError:
+    class spaces:
+        @staticmethod
+        def GPU(fn=None, **kwargs):
+            if fn is None:
+                return lambda f: f
+            return fn
+
+
 # 1. Load CLIP model globally once
-device = "cuda" if torch.cuda.is_available() else "cpu"
 model_name = "ViT-B/32"
-print(f"Loading CLIP ({model_name}) on {device}...")
-model, preprocess = clip.load(model_name, device=device)
+default_device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Loading CLIP ({model_name}) on {default_device}...")
+model, preprocess = clip.load(model_name, device=default_device)
 model.eval()
 
 VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+
+
+def get_current_device():
+    """Return 'cuda' if GPU is available (e.g. inside @spaces.GPU), else 'cpu'."""
+    return "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def extract_images_from_files(files):
@@ -62,18 +79,21 @@ def encode_image_paths(paths):
     if not tensors:
         return valid_paths, None, 0.0
 
+    curr_device = get_current_device()
+    model.to(curr_device)
+
     start = time.perf_counter()
     embeddings_list = []
     batch_size = 32
     for i in range(0, len(tensors), batch_size):
-        batch = torch.stack(tensors[i : i + batch_size]).to(device)
+        batch = torch.stack(tensors[i : i + batch_size]).to(curr_device)
         with torch.inference_mode():
             raw = model.encode_image(batch).float()
             normed = raw / raw.norm(dim=1, keepdim=True)
-            embeddings_list.append(normed)
+            embeddings_list.append(normed.cpu())
 
     embeddings = torch.cat(embeddings_list, dim=0)
-    if device == "cuda":
+    if curr_device == "cuda":
         torch.cuda.synchronize()
     elapsed = time.perf_counter() - start
 
@@ -119,6 +139,7 @@ def get_initial_state():
 initial_state, initial_status, initial_preview = get_initial_state()
 
 
+@spaces.GPU
 def handle_upload(files):
     """Handler for user uploading images or zip via Gradio."""
     if not files:
@@ -160,6 +181,7 @@ def clear_database():
     )
 
 
+@spaces.GPU
 def search(message, history, top_k, state):
     """Search user query against the uploaded images stored in session state."""
     if (
@@ -172,7 +194,10 @@ def search(message, history, top_k, state):
             [],
         )
 
-    embeddings = state["embeddings"]
+    curr_device = get_current_device()
+    model.to(curr_device)
+
+    embeddings = state["embeddings"].to(curr_device)
     image_paths_np = np.array(state["paths"])
 
     text_query = message.get("text", "")
@@ -183,7 +208,7 @@ def search(message, history, top_k, state):
         query_path = files[0]
         try:
             query_img = Image.open(query_path).convert("RGB")
-            query_tensor = preprocess(query_img).unsqueeze(0).to(device)
+            query_tensor = preprocess(query_img).unsqueeze(0).to(curr_device)
             with torch.inference_mode():
                 query_embedding = model.encode_image(query_tensor).float()
             status_msg = f"Searched using uploaded image: `{Path(query_path).name}`"
@@ -192,7 +217,7 @@ def search(message, history, top_k, state):
 
     # Text Query
     elif text_query:
-        tokens = clip.tokenize([text_query]).to(device)
+        tokens = clip.tokenize([text_query]).to(curr_device)
         with torch.inference_mode():
             query_embedding = model.encode_text(tokens).float()
         status_msg = f"Searched using text: '{text_query}'"
